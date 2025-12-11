@@ -1,0 +1,31 @@
+# 日志配置
+log:
+  level: info          # 日志级别: debug/info/warn/error
+  file_size_mb: 5      # 单文件大小上限(MB)（仅 Release 下文件输出生效）
+  max_files: 3         # 轮转文件数量
+
+# 风控配置
+risk:
+  position_limit: 5.0  # 单信号下单数量上限
+  compliance_whitelist:  # 合约白名单，为空则不校验
+    - dummy_symbol
+  workers: 2  # 风控引擎线程池大小
+
+# 策略配置
+strategy:
+  workers: 2           # 策略线程池大小
+
+# 数据源配置
+data:
+  source_type: binance   # 数据源类型：dummy/binance
+  distributor_workers: 4  # 数据分发器线程池大小
+
+# Binance 专用配置
+binance:
+  enable: true                 # 是否启用 Binance 数据源
+  base_url: https://api.binance.com
+  symbols:                     # Binance 交易对列表
+    - BTCUSDT
+    - ETHUSDT
+  poll_interval_ms: 1000       # 轮询间隔（毫秒）
+  timeout_ms: 2000             # HTTP 请求超时（毫秒）
