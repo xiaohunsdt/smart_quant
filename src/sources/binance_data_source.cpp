@@ -33,7 +33,7 @@ BinanceDataSource::BinanceDataSource(std::string base_url,
 
 void BinanceDataSource::start(RawDataCallback cb) {
     if (symbols_.empty()) {
-        Logger::instance().warn("BinanceDataSource no symbols configured");
+        Logger::instance().warn("币安数据源: 未配置交易对");
         return;
     }
     running_.store(true);
@@ -43,26 +43,26 @@ void BinanceDataSource::start(RawDataCallback cb) {
                 const auto url = fmt::format("{}/api/v3/ticker/price?symbol={}", base_url_, sym);
                 auto resp = client_.get(url, timeout_ms_);
                 if (!resp) {
-                    Logger::instance().warn("BinanceDataSource request failed for " + sym);
+                    Logger::instance().warn("币安数据源请求失败: " + sym);
                     continue;
                 }
                 auto price = parse_price(*resp);
                 if (price) {
                     cb(fmt::format("{},{}", sym, *price));
                 } else {
-                    Logger::instance().warn("BinanceDataSource parse price failed for " + sym);
+                    Logger::instance().warn("币安数据源价格解析失败: " + sym);
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms_));
         }
     });
-    Logger::instance().info("BinanceDataSource start");
+    Logger::instance().info("币安数据源已启动");
 }
 
 void BinanceDataSource::stop() {
     running_.store(false);
     if (worker_.joinable()) worker_.join();
-    Logger::instance().info("BinanceDataSource stop");
+    Logger::instance().info("币安数据源已停止");
 }
 
 } // namespace qf

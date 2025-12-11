@@ -19,14 +19,67 @@
 #include "qf/risk/compliance_checker.hpp"
 #include "strategies/sample_strategy.hpp"
 #include <iostream>
+#include <atomic>
+#include <thread>
+#include <chrono>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 using namespace qf;
+
+// 全局变量用于 Ctrl+C 处理
+static std::atomic<int> ctrl_c_count{0};
+static std::atomic<bool> should_exit{false};
+
+#ifdef _WIN32
+// Windows Ctrl+C 处理函数
+BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
+    if (dwCtrlType == CTRL_C_EVENT) {
+        int count = ++ctrl_c_count;
+        if (count == 1) {
+            Logger::instance().warn("检测到 Ctrl+C，再按一次将安全退出程序...");
+            // 3秒后重置计数，避免误操作
+            std::thread([]() {
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                ctrl_c_count.store(0);
+            }).detach();
+        } else if (count >= 2) {
+            Logger::instance().info("收到第二次 Ctrl+C，开始安全退出...");
+            should_exit.store(true);
+            return TRUE;  // 处理了信号
+        }
+        return TRUE;  // 处理了信号
+    }
+    return FALSE;  // 未处理的信号类型
+}
+#else
+// Linux/Unix SIGINT 处理函数
+#include <signal.h>
+void SignalHandler(int signal) {
+    if (signal == SIGINT) {
+        int count = ++ctrl_c_count;
+        if (count == 1) {
+            Logger::instance().warn("检测到 Ctrl+C，再按一次将安全退出程序...");
+            // 3秒后重置计数，避免误操作
+            std::thread([]() {
+                std::this_thread::sleep_for(std::chrono::seconds(3));
+                ctrl_c_count.store(0);
+            }).detach();
+        } else if (count >= 2) {
+            Logger::instance().info("收到第二次 Ctrl+C，开始安全退出...");
+            should_exit.store(true);
+        }
+    }
+}
+#endif
 
 int main() {
     // 加载 YAML 配置。
     ConfigManager cfg_mgr;
     if (!cfg_mgr.load("config/config.yaml")) {
-        std::cerr << "Failed to load config/config.yaml" << std::endl;
+        std::cerr << "加载配置文件失败: config/config.yaml" << std::endl;
         return 1;
     }
     const auto& cfg = cfg_mgr.get();
@@ -76,7 +129,7 @@ int main() {
     account_mgr.set_trading_interface(&trading);
     
     if (!account_mgr.sync_from_trading_interface()) {
-        Logger::instance().warn("Failed to sync account from trading interface, using default");
+        Logger::instance().warn("从交易接口同步账户信息失败，使用默认配置");
         account_mgr.set_account_id("demo_account");
         account_mgr.update_balance(1000000.0, 0.0); // 默认初始资金 100万
     }
@@ -85,6 +138,17 @@ int main() {
     risk.set_account_manager(&account_mgr);
     
     ReportHandler reports;
+
+    // 注册 Ctrl+C 处理函数
+#ifdef _WIN32
+    BOOL ret = SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+    if(!ret) {
+        Logger::instance().error("注册 SetConsoleCtrlHandler 失败！err: {}",GetLastError());
+    }
+#else
+    signal(SIGINT, SignalHandler);
+#endif
+    Logger::instance().info("程序已启动，按两次 Ctrl+C 可安全退出");
 
     // 启动数据源，原始字符串 -> Tick 解析 -> 缓存 + 分发 + 策略执行。
     MarketCache cache;
@@ -105,17 +169,17 @@ int main() {
     for (const auto& sig : scheduler.signals()) {
         auto normalized = signal_gen.standardize(sig);
         if (!compliance.allowed(normalized)) continue;
-        Logger::instance().info("Compliance allowed signal: {} strategy={} symbol={} volume={}", normalized.strategy_id, normalized.symbol, normalized.volume);
+        Logger::instance().info("合规检查通过，信号已允许: {} 策略={} 合约={} 数量={}", normalized.strategy_id, normalized.symbol, normalized.volume);
 
         if (!risk.check(normalized)) continue;
-        Logger::instance().info("Risk check passed signal: {} strategy={} symbol={} volume={}", normalized.strategy_id, normalized.symbol, normalized.volume);
+        Logger::instance().info("风控检查通过，信号已允许: {} 策略={} 合约={} 数量={}", normalized.strategy_id, normalized.symbol, normalized.volume);
         
         auto order = order_gen.from_signal(normalized);
         
         // 交易前再次进行资产校验。
         if (!risk.check_balance(order)) {
             Logger::instance().warn( 
-                "Order rejected due to insufficient balance: order_id={}, required={:.2f}", 
+                "订单因资金不足被拒绝: 订单ID={}, 所需金额={:.2f}", 
                 order.order_id, order.price * order.volume);
             continue;
         }
@@ -126,7 +190,10 @@ int main() {
         });
     }
 
-    while (true) {}
+    // 主循环：等待 Ctrl+C 信号
+    while (!should_exit.load()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 
     // 停止所有策略和交易
     scheduler.stop_all();
@@ -135,12 +202,12 @@ int main() {
     trading.stop();
 
     // 打印结果，用于验证流程跑通。
-    Logger::instance().info("Total orders: {}", order_mgr.list().size());
+    Logger::instance().info("订单总数: {}", order_mgr.list().size());
     
     // 打印账户信息。
     auto account = account_mgr.get_account();
     Logger::instance().info( 
-        "Account ID: {}, Total Asset: {:.2f}, Available: {:.2f}, Active Orders: {}", 
+        "账户ID: {}, 总资产: {:.2f}, 可用资金: {:.2f}, 活跃订单数: {}", 
         account.account_id, 
         account_mgr.get_total_asset(), 
         account_mgr.get_available_balance(),

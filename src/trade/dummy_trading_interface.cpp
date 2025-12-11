@@ -15,15 +15,15 @@ DummyTradingInterface::DummyTradingInterface() {
 }
 
 void DummyTradingInterface::start() {
-    qf::Logger::instance().info("Trading interface started");
+    qf::Logger::instance().info("交易接口已启动");
 }
 
 void DummyTradingInterface::stop() {
-    qf::Logger::instance().info("Trading interface stopped");
+    qf::Logger::instance().info("交易接口已停止");
 }
 
 void DummyTradingInterface::submit(const qf::OrderData& order, OrderCallback cb) {
-    qf::Logger::instance().info("Submit order " + order.order_id);
+    qf::Logger::instance().info("提交订单: " + order.order_id);
     qf::OrderData copy = order;
     copy.status = qf::OrderStatus::Submitted;
     // 直接同步回调，实际场景应等待交易所回报。
@@ -31,7 +31,7 @@ void DummyTradingInterface::submit(const qf::OrderData& order, OrderCallback cb)
 }
 
 void DummyTradingInterface::cancel(const std::string& order_id, OrderCallback cb) {
-    qf::Logger::instance().info("Cancel order " + order_id);
+    qf::Logger::instance().info("取消订单: " + order_id);
     qf::OrderData ord;
     ord.order_id = order_id;
     ord.status = qf::OrderStatus::Cancelled;

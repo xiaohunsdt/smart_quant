@@ -30,7 +30,7 @@ bool RiskEngine::check(const Signal& signal) const {
             double required_amount = signal.price * signal.volume;
             if (!account_mgr_->has_sufficient_balance(required_amount)) {
                 Logger::instance().warn(
-                    "Risk check failed: insufficient balance. Required: {:.2f}, Available: {:.2f}", 
+                    "风控检查失败: 资金不足。所需金额: {:.2f}, 可用资金: {:.2f}", 
                     required_amount, account_mgr_->get_available_balance());
                 return false;
             }
@@ -65,7 +65,7 @@ bool RiskEngine::check(const Signal& signal) const {
     for (std::size_t i = 0; i < futures.size(); ++i) {
         if (!futures[i].get()) {
             Logger::instance().warn(
-                "Risk rule blocked signal: {} strategy={} symbol={} volume={}", 
+                "风控规则阻止信号: {} 策略={} 合约={} 数量={}", 
                 rule_names[i], signal.strategy_id, signal.symbol, signal.volume);
             return false;
         }
@@ -76,7 +76,7 @@ bool RiskEngine::check(const Signal& signal) const {
         double required_amount = signal.price * signal.volume;
         if (!account_mgr_->has_sufficient_balance(required_amount)) {
             Logger::instance().warn(
-                "Risk check failed: insufficient balance. Required: {:.2f}, Available: {:.2f}", 
+                "风控检查失败: 资金不足。所需金额: {:.2f}, 可用资金: {:.2f}", 
                 required_amount, account_mgr_->get_available_balance());
             return false;
         }
@@ -91,14 +91,14 @@ void RiskEngine::set_account_manager(AccountManager* account_mgr) {
 
 bool RiskEngine::check_balance(const OrderData& order) const {
     if (!account_mgr_) {
-        Logger::instance().warn("RiskEngine: account manager not set, skip balance check");
+        Logger::instance().warn("风控引擎: 账户管理器未设置，跳过资金检查");
         return true;
     }
     
     double required_amount = order.price * order.volume;
     if (!account_mgr_->has_sufficient_balance(required_amount)) {
         Logger::instance().warn(
-            "Risk check failed for order {}: insufficient balance. Required: {:.2f}, Available: {:.2f}", 
+            "订单风控检查失败 {}: 资金不足。所需金额: {:.2f}, 可用资金: {:.2f}", 
             order.order_id, required_amount, account_mgr_->get_available_balance());
         return false;
     }

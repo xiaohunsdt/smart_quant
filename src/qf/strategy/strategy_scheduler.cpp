@@ -29,7 +29,7 @@ void StrategyScheduler::emit_signal(const Signal& signal) {
     std::lock_guard<std::mutex> lock(signal_mutex_);
     signals_.push_back(signal);
     // 记录信号来源，方便调试。
-    Logger::instance().info("Signal emitted from " + signal.strategy_id);
+    Logger::instance().info("策略信号已发出，来源: " + signal.strategy_id);
 }
 
 } // namespace qf

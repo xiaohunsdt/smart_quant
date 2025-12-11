@@ -79,7 +79,7 @@ void AccountManager::set_trading_interface(ITradingInterface* trading) {
 bool AccountManager::sync_from_trading_interface() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!trading_) {
-        Logger::instance().warn("AccountManager: trading interface not set");
+        Logger::instance().warn("账户管理器: 交易接口未设置");
         return false;
     }
     
@@ -88,12 +88,12 @@ bool AccountManager::sync_from_trading_interface() {
         account_.update_time = std::chrono::time_point_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now());
         Logger::instance().info( 
-            "Account synced: available={:.2f}, frozen={:.2f}, total={:.2f}", 
+            "账户同步成功: 可用资金={:.2f}, 冻结资金={:.2f}, 总资产={:.2f}", 
             account_.available_balance, account_.frozen_balance, account_.total_asset);
         return true;
     } catch (const std::exception& e) {
         Logger::instance().error( 
-            "AccountManager: failed to sync from trading interface: {}", std::string(e.what()));
+            "账户管理器: 从交易接口同步失败: {}", std::string(e.what()));
         return false;
     }
 }

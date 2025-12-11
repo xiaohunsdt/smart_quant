@@ -28,7 +28,7 @@ Logger& Logger::instance() {
         spdlog::set_level(spdlog::level::info);
         spdlog::flush_on(spdlog::level::info);
 
-        spdlog::info("Logger initialized! Logger level: {}", std::to_string(spdlog::level::info));
+        spdlog::info("日志系统初始化完成！日志级别: {}", std::to_string(spdlog::level::info));
         return true;
     });
     

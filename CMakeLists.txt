@@ -48,6 +48,8 @@ target_link_libraries(qf PUBLIC spdlog::spdlog yaml-cpp::yaml-cpp CURL::libcurl)
 
 if (WIN32)
     add_definitions(-D_WIN32_WINNT=0x0A00)
+    add_definitions(-DUNICODE -D_UNICODE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
 endif()
 
 add_executable(smart_quant src/main.cpp)

@@ -5,12 +5,12 @@ namespace qf {
 
 void CircuitBreaker::trip() {
     tripped_.store(true);
-    Logger::instance().error("Circuit breaker TRIPPED");
+    Logger::instance().error("熔断器已触发");
 }
 
 void CircuitBreaker::reset() {
     tripped_.store(false);
-    Logger::instance().info("Circuit breaker RESET");
+    Logger::instance().info("熔断器已重置");
 }
 
 bool CircuitBreaker::tripped() const { return tripped_.load(); }

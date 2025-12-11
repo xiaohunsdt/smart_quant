@@ -13,7 +13,7 @@ bool ComplianceChecker::allowed(const Signal& signal) const {
     // 仅允许白名单合约。
     bool ok = std::find(whitelist_.begin(), whitelist_.end(), signal.symbol) != whitelist_.end();
     if (!ok) {
-        Logger::instance().warn("Compliance reject symbol={} strategy={}", signal.symbol, signal.strategy_id);
+        Logger::instance().warn("合规检查拒绝: 合约={} 策略={}", signal.symbol, signal.strategy_id);
     }
     return ok;
 }

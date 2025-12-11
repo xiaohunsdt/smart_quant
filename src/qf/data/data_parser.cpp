@@ -5,7 +5,7 @@ namespace qf {
 
 void DataParser::parse(const std::string& raw, ParsedCallback cb) const {
     // Very small placeholder parser: raw format "symbol,price"
-    Logger::instance().debug("DataParser parse raw={}", raw);
+    Logger::instance().debug("数据解析器解析原始数据: {}", raw);
     
     auto pos = raw.find(',');
     if (pos == std::string::npos) return;
