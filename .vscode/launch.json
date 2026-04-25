@@ -1,0 +1,61 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: sq_logger (LLDB)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/sq_logger",
+      "args": [
+        "${workspaceFolder}/config/fix_market_data.cfg",
+        "${workspaceFolder}/logs-debug"
+      ],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "CMake: Build (Debug)"
+    },
+    {
+      "name": "Debug: sq_engine (LLDB)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/sq_engine",
+      "args": [
+        "${workspaceFolder}/config/fix_market_data.cfg",
+        "${workspaceFolder}/config/fix_trade.cfg",
+        "${workspaceFolder}/logs-debug",
+        "2",
+        "3"
+      ],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "CMake: Build (Debug)"
+    },
+    {
+      "name": "Debug: sq_backtest (LLDB)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/sq_backtest",
+      "args": [
+        "${input:fixlogPath}",
+        "50"
+      ],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "CMake: Build (Debug)"
+    },
+    {
+      "name": "Debug: sq_tests (LLDB)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/sq_tests",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "CMake: Build (Debug)"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "fixlogPath",
+      "type": "promptString",
+      "description": "Binary log path (.fixlog)",
+      "default": "${workspaceFolder}/logs-debug/sample.fixlog"
+    }
+  ]
+}

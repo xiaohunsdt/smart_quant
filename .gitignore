@@ -1,0 +1,13 @@
+# CMake / Conan
+build/
+build-debug/
+CMakeUserPresets.json
+
+# Runtime / secrets-adjacent
+logs/
+logs-debug/
+*.fixlog
+
+# IDE
+.idea/
+.vscode/*.code-workspace
