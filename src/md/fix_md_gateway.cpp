@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <quickfix/Session.h>
+#include <quickfix/Values.h>
 #include <quickfix/fix44/MarketDataRequest.h>
 
 #include "smartquant/common/tsc_clock.hpp"
@@ -18,6 +19,25 @@ FixMdGateway::FixMdGateway(const std::string& fix_cfg_path,
     log_factory_   = std::make_unique<FIX::FileLogFactory>(*settings_);
     initiator_     = std::make_unique<FIX::SocketInitiator>(
         *this, *store_factory_, *settings_, *log_factory_);
+
+    // Cache SubID values from the first session block so we can stamp them on
+    // every outgoing message.  QuickFIX 1.15.x reads these for session routing
+    // but does not auto-populate tag 50/57 on the wire.
+    try {
+        const auto sessions = settings_->getSessions();
+        if (!sessions.empty()) {
+            const FIX::Dictionary& dict = settings_->get(*sessions.begin());
+            if (dict.has("TargetSubID"))
+                target_sub_id_ = dict.getString("TargetSubID");
+            if (dict.has("SenderSubID"))
+                sender_sub_id_ = dict.getString("SenderSubID");
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("FixMdGateway: could not read SubID settings: {}", e.what());
+    }
+
+    if (!target_sub_id_.empty())
+        spdlog::info("FIX MD TargetSubID = {}", target_sub_id_);
 }
 
 FixMdGateway::~FixMdGateway() {
@@ -32,7 +52,17 @@ void FixMdGateway::stop() {
     if (initiator_) initiator_->stop();
 }
 
+void FixMdGateway::stamp_sub_ids(FIX::Message& msg) const {
+    if (!target_sub_id_.empty())
+        msg.getHeader().setField(FIX::TargetSubID(target_sub_id_));
+    if (!sender_sub_id_.empty())
+        msg.getHeader().setField(FIX::SenderSubID(sender_sub_id_));
+}
+
 void FixMdGateway::toAdmin(FIX::Message& msg, const FIX::SessionID& sid) {
+    // Always stamp SubIDs — cTrader validates tag 57 on every admin message.
+    stamp_sub_ids(msg);
+
     FIX::MsgType type;
     msg.getHeader().getField(type);
     if (type != FIX::MsgType_Logon) return;
@@ -51,15 +81,76 @@ void FixMdGateway::toAdmin(FIX::Message& msg, const FIX::SessionID& sid) {
     }
 }
 
+void FixMdGateway::toApp(FIX::Message& msg, const FIX::SessionID& /*sid*/) {
+    stamp_sub_ids(msg);
+}
+
 void FixMdGateway::onLogon(const FIX::SessionID& sid) {
-    spdlog::info("FIX MD logon: {}", sid.toString());
+    spdlog::info("FIX MD logon OK: {}", sid.toString());
     session_id_ = sid;
+    auth_failed_.store(false);
+    logon_time_ = std::chrono::steady_clock::now();
     subscribe_market_data(sid);
 }
 
 void FixMdGateway::onLogout(const FIX::SessionID& sid) {
+    // Detect fast-logout: if we were disconnected within 3 s of logon,
+    // it almost certainly means the server rejected our credentials.
+    if (logon_time_.time_since_epoch().count() != 0) {
+        const auto alive_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - logon_time_).count();
+        if (alive_ms < 3000) {
+            auth_failed_.store(true);
+            spdlog::error(
+                "FIX MD auth failure — session lived only {}ms. "
+                "Check SenderCompID / Username / Password in fix_market_data.cfg",
+                alive_ms);
+            return;
+        }
+    }
     spdlog::warn("FIX MD logout: {}", sid.toString());
     subscribed_ = false;
+}
+
+void FixMdGateway::fromAdmin(const FIX::Message&  msg, const FIX::SessionID& /*sid*/) {
+    FIX::MsgType msg_type;
+    msg.getHeader().getField(msg_type);
+
+    // Only interested in Logout (35=5) — it may carry a rejection reason
+    if (msg_type.getValue() != FIX::MsgType_Logout) return;
+
+    FIX::Text text;
+    if (msg.isSetField(text)) {
+        msg.getField(text);
+        const std::string& reason = text.getValue();
+        spdlog::error("FIX MD logout reason (Tag 58): \"{}\"", reason);
+
+        // Common cTrader rejection strings
+        const bool is_auth =
+            reason.find("Invalid") != std::string::npos ||
+            reason.find("credential") != std::string::npos ||
+            reason.find("Unauthori") != std::string::npos ||
+            reason.find("password") != std::string::npos ||
+            reason.find("Password") != std::string::npos ||
+            reason.find("Username") != std::string::npos ||
+            reason.find("Login") != std::string::npos;
+
+        const bool is_subid =
+            reason.find("TargetSubID") != std::string::npos ||
+            reason.find("SenderSubID") != std::string::npos;
+
+        if (is_auth) {
+            auth_failed_.store(true);
+            spdlog::error(
+                "==> Authentication failure detected. "
+                "Verify SenderCompID / Username / Password in fix_market_data.cfg");
+        } else if (is_subid) {
+            auth_failed_.store(true);
+            spdlog::error(
+                "==> Session identity mismatch. "
+                "Verify TargetSubID (expected 'QUOTE') in fix_market_data.cfg");
+        }
+    }
 }
 
 void FixMdGateway::fromApp(const FIX::Message&   msg,

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -50,11 +52,18 @@ public:
     void onCreate(const FIX::SessionID&) override {}
     void onLogon(const FIX::SessionID& sid) override;
     void onLogout(const FIX::SessionID& sid) override;
-    // Injects cTrader credentials into the FIX Logon (35=A) message.
-    // Reads Username and Password from the [SESSION] block of fix_market_data.cfg.
+    // Injects cTrader credentials and TargetSubID/SenderSubID into every
+    // outgoing admin message.  Reads from the [SESSION] block at startup.
     void toAdmin(FIX::Message& msg, const FIX::SessionID& sid) override;
-    void toApp(FIX::Message&, const FIX::SessionID&) override {}
-    void fromAdmin(const FIX::Message&, const FIX::SessionID&) override {}
+    // Stamps TargetSubID / SenderSubID on every outgoing app message.
+    void toApp(FIX::Message& msg, const FIX::SessionID& sid) override;
+    // Captures Logout (35=5) reason from Tag 58 and detects fast-logout
+    // (Logon accepted then immediately disconnected = auth failure).
+    void fromAdmin(const FIX::Message& msg,
+                   const FIX::SessionID& sid) override;
+
+    // Returns true if the last logout looked like an authentication failure.
+    [[nodiscard]] bool auth_failed() const noexcept { return auth_failed_.load(); }
     void fromApp(const FIX::Message& msg,
                  const FIX::SessionID& sid) override;
 
@@ -67,9 +76,17 @@ private:
     // Send a MarketDataRequest for XAUUSD on logon
     void subscribe_market_data(const FIX::SessionID& sid);
 
+    // Stamp TargetSubID (tag 57) and SenderSubID (tag 50) on every outgoing
+    // message header.  QuickFIX 1.15.x reads these from the config for
+    // session routing but does not auto-populate the wire header.
+    void stamp_sub_ids(FIX::Message& msg) const;
+
     BinaryLogger& logger_;
     MdQueue*      queue_;
     OrderBook     book_;
+
+    std::string target_sub_id_;
+    std::string sender_sub_id_;
 
     std::unique_ptr<FIX::SessionSettings>  settings_;
     std::unique_ptr<FIX::FileStoreFactory> store_factory_;
@@ -78,6 +95,10 @@ private:
 
     FIX::SessionID session_id_;
     bool           subscribed_{false};
+
+    // Auth-failure detection
+    std::chrono::steady_clock::time_point logon_time_{};
+    std::atomic<bool>                     auth_failed_{false};
 };
 
 }  // namespace sq

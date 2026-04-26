@@ -4,6 +4,7 @@ build-debug/
 CMakeUserPresets.json
 
 # Runtime / secrets-adjacent
+log/
 logs/
 logs-debug/
 *.fixlog
@@ -11,3 +12,5 @@ logs-debug/
 # IDE
 .idea/
 .vscode/*.code-workspace
+.cursor/
+.cache/

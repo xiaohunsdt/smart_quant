@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 
 #include <spdlog/spdlog.h>
@@ -69,12 +68,20 @@ int main(int argc, char* argv[]) {
         spdlog::info("sq_logger running — press Ctrl+C to stop");
 
         while (g_running.load(std::memory_order_relaxed)) {
-            // Flush binary log every second
             ::usleep(1'000'000);
             binary_logger.flush();
 
+            // Abort early on auth failure — no point retrying with wrong creds
+            if (gateway.auth_failed()) {
+                spdlog::error("Stopping: authentication failure. "
+                              "Fix credentials in fix_market_data.cfg and restart.");
+                g_running.store(false);
+                break;
+            }
+
             const uint64_t written = binary_logger.total_written();
-            spdlog::info("Written: {:.2f} MiB ({} bytes)", static_cast<double>(written) / (1 << 20), written);
+            spdlog::info("Written: {:.2f} MiB ({} bytes)",
+                         static_cast<double>(written) / (1 << 20), written);
         }
 
         spdlog::info("Shutting down ...");
