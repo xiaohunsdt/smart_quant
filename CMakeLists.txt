@@ -39,6 +39,7 @@ find_package(Catch2 3 REQUIRED)
 add_library(sq_core STATIC
     src/common/tsc_clock.cpp
     src/log/binary_logger.cpp
+    src/log/lob_event_logger.cpp
     src/md/order_book.cpp
     src/md/fix_md_gateway.cpp
     src/alpha/delta_factor.cpp

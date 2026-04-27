@@ -1,138 +1,17 @@
 #include <algorithm>
-#include <cstdio>
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include <quickfix/DataDictionary.h>
-#include <quickfix/Message.h>
-#include <quickfix/fix44/MarketDataIncrementalRefresh.h>
-#include <quickfix/fix44/MarketDataSnapshotFullRefresh.h>
-
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "smartquant/common/types.hpp"
-#include "smartquant/log/binary_logger.hpp"
+#include "smartquant/log/lob_event_logger.hpp"
 #include "smartquant/md/order_book.hpp"
 #include "smartquant/alpha/signal_engine.hpp"
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-static void parse_lob_events_from_fix(
-    const char* raw, uint32_t len,
-    uint64_t ts_ns,
-    sq::OrderBook& book,
-    std::vector<sq::LOBEvent>& out) {
-
-    FIX::Message msg;
-    try {
-        msg.setString(std::string(raw, len), false, nullptr);
-    } catch (...) {
-        return;
-    }
-
-    FIX::MsgType msg_type;
-    try {
-        msg.getHeader().getField(msg_type);
-    } catch (...) {
-        return;
-    }
-
-    // Separate lambdas for incremental and snapshot to avoid template
-    // instantiation issues (snapshot group has no MDUpdateAction field).
-
-    auto parse_incremental = [&](FIX44::MarketDataIncrementalRefresh& msg) {
-        FIX::NoMDEntries num;
-        try { msg.get(num); } catch (...) { return; }
-        FIX44::MarketDataIncrementalRefresh::NoMDEntries group;
-
-        for (int i = 1; i <= num; ++i) {
-            msg.getGroup(i, group);
-
-            FIX::MDUpdateAction act_f;
-            FIX::MDEntryType    type_f;
-            FIX::MDEntryPx      px_f;
-            FIX::MDEntrySize    sz_f;
-
-            try { group.get(act_f);  } catch (...) { continue; }
-            try { group.get(type_f); } catch (...) { continue; }
-
-            sq::LOBEvent ev{};
-            ev.timestamp_ns = ts_ns;
-
-            switch (act_f.getValue()) {
-            case '0': ev.action = sq::MDUpdateAction::New;    break;
-            case '1': ev.action = sq::MDUpdateAction::Change; break;
-            case '2': ev.action = sq::MDUpdateAction::Delete; break;
-            default:  continue;
-            }
-            switch (type_f.getValue()) {
-            case '0': ev.side = sq::MDEntryType::Bid;   break;
-            case '1': ev.side = sq::MDEntryType::Offer; break;
-            case '2': ev.side = sq::MDEntryType::Trade; break;
-            default:  continue;
-            }
-            try { group.get(px_f); ev.price = sq::to_price(px_f.getValue()); } catch (...) {}
-            try { group.get(sz_f); ev.qty   = static_cast<sq::Qty>(sz_f.getValue()); } catch (...) {}
-
-            book.update(ev);
-            out.push_back(ev);
-        }
-    };
-
-    auto parse_snapshot = [&](FIX44::MarketDataSnapshotFullRefresh& msg) {
-        FIX::NoMDEntries num;
-        try { msg.get(num); } catch (...) { return; }
-        FIX44::MarketDataSnapshotFullRefresh::NoMDEntries group;
-
-        book.clear();
-
-        for (int i = 1; i <= num; ++i) {
-            msg.getGroup(i, group);
-
-            FIX::MDEntryType type_f;
-            FIX::MDEntryPx   px_f;
-            FIX::MDEntrySize sz_f;
-
-            try { group.get(type_f); } catch (...) { continue; }
-
-            sq::LOBEvent ev{};
-            ev.timestamp_ns = ts_ns;
-            ev.action       = sq::MDUpdateAction::New;
-
-            switch (type_f.getValue()) {
-            case '0': ev.side = sq::MDEntryType::Bid;   break;
-            case '1': ev.side = sq::MDEntryType::Offer; break;
-            default:  continue;
-            }
-            try { group.get(px_f); ev.price = sq::to_price(px_f.getValue()); } catch (...) {}
-            try { group.get(sz_f); ev.qty   = static_cast<sq::Qty>(sz_f.getValue()); } catch (...) {}
-
-            book.update(ev);
-            out.push_back(ev);
-        }
-    };
-
-    const std::string& type = msg_type.getValue();
-    if (type == "X") {
-        FIX44::MarketDataIncrementalRefresh typed;
-        try {
-            typed.setString(std::string(raw, len), false, nullptr);
-            parse_incremental(typed);
-        } catch (...) {}
-    } else if (type == "W") {
-        FIX44::MarketDataSnapshotFullRefresh typed;
-        try {
-            typed.setString(std::string(raw, len), false, nullptr);
-            parse_snapshot(typed);
-        } catch (...) {}
-    }
-
-}
 
 // ── Backtest result accumulator ───────────────────────────────────────────────
 
@@ -180,10 +59,10 @@ int main(int argc, char* argv[]) {
     spdlog::set_default_logger(console);
     spdlog::set_level(spdlog::level::info);
 
-    spdlog::info("Loading binary log: {}", log_path);
+    spdlog::info("Loading LOB log: {}", log_path);
 
-    sq::BinaryLogger::Reader reader(log_path);
-    spdlog::info("Bytes available: {}", reader.bytes_available());
+    sq::LobEventLogger::Reader reader(log_path);
+    spdlog::info("Records available: {}", reader.total_records());
 
     sq::OrderBook  book;
     sq::SignalEngine engine(thresh_delta);
@@ -194,95 +73,78 @@ int main(int argc, char* argv[]) {
     BacktestResult result;
     std::vector<PendingSignal> pending;
 
-    // Price history for forward outcome lookup (ts_ns → best_ask or best_bid)
-    // We keep a sliding window of price points
+    // Price history for forward outcome lookup
     struct PricePoint { uint64_t ts_ns; sq::Price bid; sq::Price ask; };
     std::vector<PricePoint> price_history;
     price_history.reserve(1 << 20);
 
     static constexpr uint64_t kLookForwardNs = 5'000'000'000ULL;  // 5 seconds
 
-    sq::BinaryLogger::Reader::Entry entry{};
+    sq::LOBEvent ev{};
     uint64_t rec = 0;
 
-    while (reader.next(entry)) {
+    while (reader.next(ev)) {
         ++rec;
-        if (rec % 100'000 == 0)
+        if (rec % 500'000 == 0)
             spdlog::info("Processed {} records ...", rec);
 
-        // Parse LOBEvents from raw FIX bytes
-        std::vector<sq::LOBEvent> events;
-        parse_lob_events_from_fix(entry.data, entry.length,
-                                   entry.timestamp_ns, book, events);
+        // Apply event to order book
+        book.update(ev);
 
-        for (const auto& ev : events) {
-            // Record price point
-            if (book.best_bid() > 0 && book.best_ask() > 0)
-                price_history.push_back({ev.timestamp_ns,
-                                         book.best_bid(),
-                                         book.best_ask()});
+        // Record L1 price point after book update
+        if (book.best_bid() > 0 && book.best_ask() > 0)
+            price_history.push_back({ev.timestamp_ns,
+                                     book.best_bid(),
+                                     book.best_ask()});
 
-            // Evaluate pending signals whose 5-second window has elapsed
-            if (!pending.empty()) {
-                auto it = pending.begin();
-                while (it != pending.end()) {
-                    if (ev.timestamp_ns - it->sig.trigger_time_ns >= kLookForwardNs) {
-                        // Find the price at signal time + 5s
-                        const uint64_t target_ts =
-                            it->sig.trigger_time_ns + kLookForwardNs;
-                        auto pit = std::lower_bound(
-                            price_history.begin(), price_history.end(),
-                            target_ts,
-                            [](const PricePoint& p, uint64_t t){ return p.ts_ns < t; });
+        // Evaluate pending signals whose 5-second window has elapsed
+        if (!pending.empty()) {
+            auto it = pending.begin();
+            while (it != pending.end()) {
+                if (ev.timestamp_ns - it->sig.trigger_time_ns >= kLookForwardNs) {
+                    const uint64_t target_ts =
+                        it->sig.trigger_time_ns + kLookForwardNs;
+                    auto pit = std::lower_bound(
+                        price_history.begin(), price_history.end(),
+                        target_ts,
+                        [](const PricePoint& p, uint64_t t){ return p.ts_ns < t; });
 
-                        if (pit != price_history.end()) {
-                            const sq::Price future_bid = pit->bid;
-                            const sq::Price future_ask = pit->ask;
-
-                            double move_ticks = 0.0;
-                            bool win = false;
-
-                            if (it->sig.direction == sq::Direction::Buy) {
-                                // Win if future ask moved up ≥ 1 tick
-                                const sq::Price diff = future_ask - it->entry_price;
-                                move_ticks = static_cast<double>(diff) / sq::kPriceScale;
-                                win = (diff >= sq::kPriceScale);
-                            } else {
-                                // Win if future bid moved down ≥ 1 tick
-                                const sq::Price diff = it->entry_price - future_bid;
-                                move_ticks = static_cast<double>(diff) / sq::kPriceScale;
-                                win = (diff >= sq::kPriceScale);
-                            }
-
-                            result.total_move_ticks += move_ticks;
-                            if (win) ++result.wins; else ++result.losses;
-
-                            if (it->sf_fired) {
-                                ++result.sf_total;
-                                if (win) ++result.sf_wins;
-                            }
+                    if (pit != price_history.end()) {
+                        double move_ticks = 0.0;
+                        bool win = false;
+                        if (it->sig.direction == sq::Direction::Buy) {
+                            const sq::Price diff = pit->ask - it->entry_price;
+                            move_ticks = static_cast<double>(diff) / sq::kPriceScale;
+                            win = (diff >= sq::kPriceScale);
+                        } else {
+                            const sq::Price diff = it->entry_price - pit->bid;
+                            move_ticks = static_cast<double>(diff) / sq::kPriceScale;
+                            win = (diff >= sq::kPriceScale);
                         }
-                        it = pending.erase(it);
-                    } else {
-                        ++it;
+                        result.total_move_ticks += move_ticks;
+                        if (win) ++result.wins; else ++result.losses;
+                        if (it->sf_fired) {
+                            ++result.sf_total;
+                            if (win) ++result.sf_wins;
+                        }
                     }
+                    it = pending.erase(it);
+                } else {
+                    ++it;
                 }
             }
+        }
 
-            // Run dual-factor engine
-            if (engine.on_event(ev, book)) {
-                const sq::Signal& sig = engine.last_signal();
-                ++result.total_signals;
-                if (sig.direction == sq::Direction::Buy)  ++result.buy_signals;
-                if (sig.direction == sq::Direction::Sell) ++result.sell_signals;
-
-                const bool sf_fired = sf_engine.on_event(ev, book);
-                pending.push_back({sig,
-                                   sig.l1_price,
-                                   sf_fired});
-            } else {
-                sf_engine.on_event(ev, book);
-            }
+        // Run dual-factor engine
+        if (engine.on_event(ev, book)) {
+            const sq::Signal& sig = engine.last_signal();
+            ++result.total_signals;
+            if (sig.direction == sq::Direction::Buy)  ++result.buy_signals;
+            if (sig.direction == sq::Direction::Sell) ++result.sell_signals;
+            const bool sf_fired = sf_engine.on_event(ev, book);
+            pending.push_back({sig, sig.l1_price, sf_fired});
+        } else {
+            sf_engine.on_event(ev, book);
         }
     }
 

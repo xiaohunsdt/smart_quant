@@ -139,11 +139,9 @@ void OrderManager::fromApp(const FIX::Message&   msg,
 
     try {
         if (msg_type == FIX::MsgType_ExecutionReport) {
-            on_execution_report(
-                static_cast<const FIX44::ExecutionReport&>(msg));
+            on_execution_report(static_cast<const FIX44::ExecutionReport&>(msg));
         } else if (msg_type == FIX::MsgType_OrderCancelReject) {
-            on_cancel_reject(
-                static_cast<const FIX44::OrderCancelReject&>(msg));
+            on_cancel_reject(static_cast<const FIX44::OrderCancelReject&>(msg));
         }
     } catch (const FIX::FieldNotFound& e) {
         spdlog::warn("OrderManager: field not found: {}", e.what());
@@ -172,15 +170,10 @@ void OrderManager::on_execution_report(const FIX44::ExecutionReport& msg) {
 
         o.fill_price  = to_price(last_px.getValue());
         o.fill_ts_ns  = TscClock::now_ns();
-        o.status      = (et == FIX::ExecType_FILL)
-                            ? OrderStatus::Filled
-                            : OrderStatus::Pending;  // partial
+        o.status      = (et == FIX::ExecType_FILL) ? OrderStatus::Filled : OrderStatus::Pending;  // partial
 
         const uint64_t latency_ns = o.fill_ts_ns - o.sent_ts_ns;
-        spdlog::info("Fill: {} price={:.2f} latency={}µs",
-                     id,
-                     from_price(o.fill_price),
-                     latency_ns / 1000);
+        spdlog::info("Fill: {} price={:.2f} latency={}µs", id, from_price(o.fill_price), latency_ns / 1000);
 
         risk_mgr_.on_fill(o, o.fill_ts_ns);
         if (on_fill_) on_fill_(o);
@@ -189,11 +182,8 @@ void OrderManager::on_execution_report(const FIX44::ExecutionReport& msg) {
             open_orders_.erase(it);
 
     } else if (et == FIX::ExecType_REJECTED || et == FIX::ExecType_EXPIRED) {
-        o.status = (et == FIX::ExecType_REJECTED)
-                       ? OrderStatus::Rejected
-                       : OrderStatus::Cancelled;
-        spdlog::warn("Order {} {}", id,
-                     (et == FIX::ExecType_REJECTED) ? "rejected" : "expired");
+        o.status = (et == FIX::ExecType_REJECTED) ? OrderStatus::Rejected : OrderStatus::Cancelled;
+        spdlog::warn("Order {} {}", id, (et == FIX::ExecType_REJECTED) ? "rejected" : "expired");
         risk_mgr_.on_reject(o);
         if (on_reject_) on_reject_(o);
         open_orders_.erase(it);

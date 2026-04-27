@@ -9,11 +9,22 @@
 using namespace sq;
 
 static LOBEvent trade_ev(double price, Qty qty, uint64_t ts_ns) {
-    return LOBEvent{ts_ns, to_price(price), qty, MDUpdateAction::New, MDEntryType::Trade};
+    LOBEvent ev{};
+    ev.timestamp_ns = ts_ns;
+    ev.price        = to_price(price);
+    ev.qty          = qty;
+    ev.action       = MDUpdateAction::New;
+    ev.side         = MDEntryType::Trade;
+    return ev;
 }
 
 static LOBEvent cancel_ev(MDEntryType side, double price, uint64_t ts_ns) {
-    return LOBEvent{ts_ns, to_price(price), 0, MDUpdateAction::Delete, side};
+    LOBEvent ev{};
+    ev.timestamp_ns = ts_ns;
+    ev.price        = to_price(price);
+    ev.action       = MDUpdateAction::Delete;
+    ev.side         = side;
+    return ev;
 }
 
 // ── DeltaFactor ───────────────────────────────────────────────────────────────
@@ -118,10 +129,15 @@ TEST_CASE("SignalEngine: no signal on sparse data", "[signal]") {
     OrderBook book;
     SignalEngine engine(50.0, 1.5);
 
-    book.update({0, to_price(2000.0), 10, MDUpdateAction::New, MDEntryType::Bid});
-    book.update({0, to_price(2001.0), 10, MDUpdateAction::New, MDEntryType::Offer});
+    LOBEvent bid_ev{}; bid_ev.entry_id=1; bid_ev.action=MDUpdateAction::New;
+    bid_ev.side=MDEntryType::Bid; bid_ev.price=to_price(2000.0); bid_ev.qty=10;
+    book.update(bid_ev);
+    LOBEvent ask_ev{}; ask_ev.entry_id=2; ask_ev.action=MDUpdateAction::New;
+    ask_ev.side=MDEntryType::Offer; ask_ev.price=to_price(2001.0); ask_ev.qty=10;
+    book.update(ask_ev);
 
-    LOBEvent ev{1'000'000, to_price(2000.5), 1, MDUpdateAction::New, MDEntryType::Trade};
+    LOBEvent ev{}; ev.timestamp_ns=1'000'000; ev.price=to_price(2000.5);
+    ev.qty=1; ev.action=MDUpdateAction::New; ev.side=MDEntryType::Trade;
     bool fired = engine.on_event(ev, book);
     REQUIRE(!fired);
     REQUIRE(engine.last_signal().direction == Direction::None);

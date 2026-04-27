@@ -5,13 +5,14 @@
 #include <quickfix/Session.h>
 #include <quickfix/Values.h>
 #include <quickfix/fix44/MarketDataRequest.h>
+#include <quickfix/fix44/MarketDataRequestReject.h>
 
 #include "smartquant/common/tsc_clock.hpp"
 
 namespace sq {
 
 FixMdGateway::FixMdGateway(const std::string& fix_cfg_path,
-                            BinaryLogger&      logger,
+                            LobEventLogger&    logger,
                             MdQueue*           queue)
     : logger_(logger), queue_(queue) {
     settings_      = std::make_unique<FIX::SessionSettings>(fix_cfg_path);
@@ -20,9 +21,9 @@ FixMdGateway::FixMdGateway(const std::string& fix_cfg_path,
     initiator_     = std::make_unique<FIX::SocketInitiator>(
         *this, *store_factory_, *settings_, *log_factory_);
 
-    // Cache SubID values from the first session block so we can stamp them on
-    // every outgoing message.  QuickFIX 1.15.x reads these for session routing
-    // but does not auto-populate tag 50/57 on the wire.
+    // Cache SubID values and symbol configuration from the first session block.
+    // QuickFIX 1.15.x reads SubIDs for session routing but does not
+    // auto-populate tag 50/57 on the wire.
     try {
         const auto sessions = settings_->getSessions();
         if (!sessions.empty()) {
@@ -31,13 +32,30 @@ FixMdGateway::FixMdGateway(const std::string& fix_cfg_path,
                 target_sub_id_ = dict.getString("TargetSubID");
             if (dict.has("SenderSubID"))
                 sender_sub_id_ = dict.getString("SenderSubID");
+
+            // cTrader requires a numeric symbol ID in Tag 55.
+            // Find it in cTrader → symbol panel → Symbol Info → FIX Symbol ID.
+            if (dict.has("SymbolID"))
+                symbol_id_ = dict.getString("SymbolID");
+            if (dict.has("SymbolName"))
+                symbol_name_ = dict.getString("SymbolName");
         }
     } catch (const std::exception& e) {
-        spdlog::warn("FixMdGateway: could not read SubID settings: {}", e.what());
+        spdlog::warn("FixMdGateway: could not read session settings: {}", e.what());
     }
 
     if (!target_sub_id_.empty())
         spdlog::info("FIX MD TargetSubID = {}", target_sub_id_);
+
+    if (symbol_id_.empty()) {
+        spdlog::error(
+            "FixMdGateway: SymbolID not set in fix config. "
+            "cTrader requires a numeric symbol ID in Tag 55. "
+            "Find it in cTrader → symbol panel → Symbol Info → FIX Symbol ID, "
+            "then add 'SymbolID=<number>' to the [SESSION] block.");
+    } else {
+        spdlog::info("FIX MD Symbol = {} (ID={})", symbol_name_, symbol_id_);
+    }
 }
 
 FixMdGateway::~FixMdGateway() {
@@ -155,12 +173,10 @@ void FixMdGateway::fromAdmin(const FIX::Message&  msg, const FIX::SessionID& /*s
 
 void FixMdGateway::fromApp(const FIX::Message&   msg,
                            const FIX::SessionID& sid) {
-    // TSC timestamp is captured as the FIRST operation — before any parsing
+    // TSC timestamp captured first — before any parsing — for accurate latency.
+    // Parsed LOBEvents are written to the compact logger inside on_snapshot /
+    // on_incremental_refresh; no raw FIX bytes are stored.
     const uint64_t ts_ns = TscClock::now_ns();
-
-    // Write raw FIX bytes to binary log
-    const std::string raw = msg.toString();
-    logger_.write(ts_ns, raw.data(), static_cast<uint32_t>(raw.size()));
 
     const FIX::MsgType msg_type;
     msg.getHeader().getField(const_cast<FIX::MsgType&>(msg_type));
@@ -175,6 +191,9 @@ void FixMdGateway::fromApp(const FIX::Message&   msg,
             on_snapshot(
                 static_cast<const FIX44::MarketDataSnapshotFullRefresh&>(msg),
                 ts_ns);
+        } else if (type == "Y") {
+            on_md_reject(
+                static_cast<const FIX44::MarketDataRequestReject&>(msg));
         }
     } catch (const FIX::FieldNotFound& e) {
         spdlog::warn("FIX field not found in {}: {}", type, e.what());
@@ -195,12 +214,7 @@ void FixMdGateway::on_incremental_refresh(
         msg.getGroup(i, group);
 
         FIX::MDUpdateAction action_field;
-        FIX::MDEntryType    type_field;
-        FIX::MDEntryPx      px_field;
-        FIX::MDEntrySize    sz_field;
-
         group.get(action_field);
-        group.get(type_field);
 
         LOBEvent ev{};
         ev.timestamp_ns = ts_ns;
@@ -213,24 +227,42 @@ void FixMdGateway::on_incremental_refresh(
         default:  continue;
         }
 
-        // MDEntryType: '0'=Bid, '1'=Offer, '2'=Trade
-        switch (type_field.getValue()) {
-        case '0': ev.side = MDEntryType::Bid;   break;
-        case '1': ev.side = MDEntryType::Offer; break;
-        case '2': ev.side = MDEntryType::Trade; break;
-        default:  continue;
+        // MDEntryID (tag 278): cTrader unique order ID — present on all actions.
+        if (group.isSetField(278)) {
+            try { ev.entry_id = std::stoull(group.getField(278)); }
+            catch (...) {}
         }
 
-        if (group.isSetField(px_field.getField())) {
-            group.get(px_field);
-            ev.price = to_price(px_field.getValue());
-        }
-        if (group.isSetField(sz_field.getField())) {
-            group.get(sz_field);
-            ev.qty = static_cast<Qty>(sz_field.getValue());
+        // For Delete entries cTrader omits MDEntryType, price, and qty.
+        // Resolve them from the in-process order book so the log record is complete.
+        if (ev.action == MDUpdateAction::Delete) {
+            book_.lookup_entry(ev.entry_id, ev.side, ev.price, ev.qty);
+        } else {
+            FIX::MDEntryType type_field;
+            group.get(type_field);  // required for New / Change
+
+            // MDEntryType: '0'=Bid, '1'=Offer, '2'=Trade
+            switch (type_field.getValue()) {
+            case '0': ev.side = MDEntryType::Bid;   break;
+            case '1': ev.side = MDEntryType::Offer; break;
+            case '2': ev.side = MDEntryType::Trade; break;
+            default:  continue;
+            }
+
+            FIX::MDEntryPx   px_field;
+            FIX::MDEntrySize sz_field;
+            if (group.isSetField(px_field.getField())) {
+                group.get(px_field);
+                ev.price = to_price(px_field.getValue());
+            }
+            if (group.isSetField(sz_field.getField())) {
+                group.get(sz_field);
+                ev.qty = static_cast<Qty>(sz_field.getValue());
+            }
         }
 
-        // Update in-process order book
+        // Persist parsed event and update in-process order book
+        logger_.write(ev);
         book_.update(ev);
 
         // Push to Alpha thread (best-effort — if queue full, drop)
@@ -271,6 +303,13 @@ void FixMdGateway::on_snapshot(
         default:  continue;  // Skip trade entries in snapshot
         }
 
+        // MDEntryID (tag 278) — present in snapshot but not in the typed FIELD_SET
+        // of MarketDataSnapshotFullRefresh::NoMDEntries; use raw tag access.
+        if (group.isSetField(278)) {
+            try { ev.entry_id = std::stoull(group.getField(278)); }
+            catch (...) {}
+        }
+
         if (group.isSetField(px_field.getField())) {
             group.get(px_field);
             ev.price = to_price(px_field.getValue());
@@ -280,6 +319,7 @@ void FixMdGateway::on_snapshot(
             ev.qty = static_cast<Qty>(sz_field.getValue());
         }
 
+        logger_.write(ev);
         book_.update(ev);
         if (queue_) queue_->push(ev);
     }
@@ -289,11 +329,66 @@ void FixMdGateway::on_snapshot(
                  from_price(book_.best_ask()));
 }
 
+void FixMdGateway::on_md_reject(
+    const FIX44::MarketDataRequestReject& msg) {
+
+    // Tag 281: MDReqRejReason (required)
+    static const char* const kRejectReasons[] = {
+        "0=UnknownSymbol",
+        "1=DuplicateMDReqID",
+        "2=InsufficientBandwidth",
+        "3=InsufficientPermissions",
+        "4=UnsupportedSubscriptionRequestType",
+        "5=UnsupportedMarketDepth",
+        "6=UnsupportedMDUpdateType",
+        "7=UnsupportedAggregatedBook",
+        "8=UnsupportedMDEntryType",
+        "9=UnsupportedTradingSessionID",
+    };
+
+    std::string reason_str = "Unknown";
+    FIX::MDReqRejReason reason;
+    if (msg.isSetField(reason)) {
+        msg.get(reason);
+        const int r = static_cast<int>(reason.getValue());
+        if (r >= 0 && r < static_cast<int>(std::size(kRejectReasons)))
+            reason_str = kRejectReasons[r];
+        else
+            reason_str = std::to_string(r);
+    }
+
+    std::string text_str;
+    FIX::Text text;
+    if (msg.isSetField(text)) {
+        msg.get(text);
+        text_str = text.getValue();
+    }
+
+    spdlog::error(
+        "MarketDataRequestReject (35=Y): reason={}{} "
+        "— No market data will flow. "
+        "If reason=DuplicateMDReqID, set ResetOnLogon=Y in fix_market_data.cfg "
+        "or change MDReqID in subscribe_market_data().",
+        reason_str,
+        text_str.empty() ? "" : (", text=\"" + text_str + "\""));
+
+    subscribed_ = false;  // allow re-subscribe on next logon
+}
+
 void FixMdGateway::subscribe_market_data(const FIX::SessionID& sid) {
     if (subscribed_) return;
 
+    if (symbol_id_.empty()) {
+        spdlog::error(
+            "subscribe_market_data: SymbolID not configured — cannot subscribe. "
+            "Add 'SymbolID=<numeric_id>' to the [SESSION] block in fix_market_data.cfg.");
+        return;
+    }
+
+    const std::string req_id = symbol_name_ + "_SUB_1";
+
     FIX44::MarketDataRequest req;
-    req.set(FIX::MDReqID("XAUUSD_SUB_1"));
+    req.set(FIX::MDReqID(req_id));
     req.set(FIX::SubscriptionRequestType(FIX::SubscriptionRequestType_SNAPSHOT_PLUS_UPDATES));
     req.set(FIX::MarketDepth(0));   // 0 = full book
     req.set(FIX::MDUpdateType(FIX::MDUpdateType_INCREMENTAL_REFRESH));
@@ -307,14 +402,14 @@ void FixMdGateway::subscribe_market_data(const FIX::SessionID& sid) {
     type_group.set(FIX::MDEntryType(FIX::MDEntryType_TRADE));
     req.addGroup(type_group);
 
-    // Symbol: XAUUSD
+    // cTrader requires the numeric symbol ID (not the name string) in Tag 55.
     FIX44::MarketDataRequest::NoRelatedSym sym_group;
-    sym_group.set(FIX::Symbol("XAUUSD"));
+    sym_group.set(FIX::Symbol(symbol_id_));
     req.addGroup(sym_group);
 
     FIX::Session::sendToTarget(req, sid);
     subscribed_ = true;
-    spdlog::info("Sent MarketDataRequest for XAUUSD");
+    spdlog::info("Sent MarketDataRequest for {} (ID={})", symbol_name_, symbol_id_);
 }
 
 }  // namespace sq

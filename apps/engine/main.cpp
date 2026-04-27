@@ -12,7 +12,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "smartquant/common/tsc_clock.hpp"
-#include "smartquant/log/binary_logger.hpp"
+#include "smartquant/log/lob_event_logger.hpp"
 #include "smartquant/md/fix_md_gateway.hpp"
 #include "smartquant/alpha/signal_engine.hpp"
 #include "smartquant/oms/order_manager.hpp"
@@ -117,13 +117,13 @@ int main(int argc, char* argv[]) {
         sq::TscClock::calibrate(20);
         spdlog::info("TSC freq = {:.4f} GHz", sq::TscClock::freq_ghz());
 
-        // ── 2. Binary Logger ──────────────────────────────────────────────────
+        // ── 2. LOB Logger ─────────────────────────────────────────────────────
         std::filesystem::create_directories(log_dir);
         const std::string log_path =
             log_dir + "/xauusd_" +
-            std::to_string(sq::TscClock::now_ns() / 1'000'000'000ULL) + ".fixlog";
-        spdlog::info("Binary log: {}", log_path);
-        sq::BinaryLogger binary_logger(log_path);
+            std::to_string(sq::TscClock::now_ns() / 1'000'000'000ULL) + ".loblog";
+        spdlog::info("LOB log: {}", log_path);
+        sq::LobEventLogger binary_logger(log_path);
 
         // ── 3. Construct components ───────────────────────────────────────────
         sq::MdQueue       md_queue;
@@ -181,8 +181,9 @@ int main(int argc, char* argv[]) {
         oms.stop();
         alpha_thr.join();
         binary_logger.flush();
-        spdlog::info("Shutdown complete. Total log: {} bytes",
-                     binary_logger.total_written());
+        spdlog::info("Shutdown complete. Total log: {} records ({:.2f} MiB)",
+                     binary_logger.total_written(),
+                     static_cast<double>(binary_logger.bytes_written()) / (1 << 20));
 
     } catch (const std::exception& ex) {
         spdlog::error("Fatal: {}", ex.what());

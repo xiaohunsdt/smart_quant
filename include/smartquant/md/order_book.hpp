@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <map>
+#include <unordered_map>
 #include <functional>
 
 #include "smartquant/common/types.hpp"
@@ -44,11 +45,29 @@ public:
     [[nodiscard]] std::size_t bid_depth() const noexcept { return bids_.size(); }
     [[nodiscard]] std::size_t ask_depth() const noexcept { return asks_.size(); }
 
+    // Look up a live L3 entry by its MDEntryID.
+    // Returns false if not found (e.g. entry already deleted or never seen).
+    [[nodiscard]] bool lookup_entry(uint64_t entry_id,
+                                    MDEntryType& side,
+                                    Price&       price,
+                                    Qty&         qty) const noexcept;
+
 private:
+    // L3 entry record: what we remember about each individual order.
+    struct EntryInfo {
+        MDEntryType side;
+        Price       price;
+        Qty         qty;
+    };
+
     // bids: highest price first → use default map (ascending) + rbegin
     // asks: lowest price first  → use default map (ascending) + begin
-    std::map<Price, Qty> bids_;   // price → qty
-    std::map<Price, Qty> asks_;   // price → qty
+    std::map<Price, Qty> bids_;   // price → aggregated qty
+    std::map<Price, Qty> asks_;   // price → aggregated qty
+
+    // L3 map: MDEntryID → entry info (needed to resolve Delete updates that
+    // carry only the entry ID, without price or side).
+    std::unordered_map<uint64_t, EntryInfo> entries_;
 
     TradeCallback  on_trade_;
     CancelCallback on_cancel_;

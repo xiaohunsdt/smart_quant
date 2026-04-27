@@ -29,11 +29,12 @@ enum class MDEntryType : uint8_t {
 };
 
 struct LOBEvent {
-    uint64_t      timestamp_ns;
-    Price         price;
-    Qty           qty;
+    uint64_t       timestamp_ns;
+    uint64_t       entry_id{0};    // cTrader MDEntryID (tag 278) — unique per order
+    Price          price{0};
+    Qty            qty{0};
     MDUpdateAction action;
-    MDEntryType   side;
+    MDEntryType    side{MDEntryType::Bid};
 };
 
 // ── Trade signal ──────────────────────────────────────────────────────────────

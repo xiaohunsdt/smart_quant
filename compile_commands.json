@@ -1,0 +1,92 @@
+[
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/common/tsc_clock.cpp.o -c /mnt/nas/smart-quant/src/common/tsc_clock.cpp",
+  "file": "/mnt/nas/smart-quant/src/common/tsc_clock.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/common/tsc_clock.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/log/binary_logger.cpp.o -c /mnt/nas/smart-quant/src/log/binary_logger.cpp",
+  "file": "/mnt/nas/smart-quant/src/log/binary_logger.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/log/binary_logger.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/md/order_book.cpp.o -c /mnt/nas/smart-quant/src/md/order_book.cpp",
+  "file": "/mnt/nas/smart-quant/src/md/order_book.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/md/order_book.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/md/fix_md_gateway.cpp.o -c /mnt/nas/smart-quant/src/md/fix_md_gateway.cpp",
+  "file": "/mnt/nas/smart-quant/src/md/fix_md_gateway.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/md/fix_md_gateway.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/alpha/delta_factor.cpp.o -c /mnt/nas/smart-quant/src/alpha/delta_factor.cpp",
+  "file": "/mnt/nas/smart-quant/src/alpha/delta_factor.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/alpha/delta_factor.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/alpha/cancel_factor.cpp.o -c /mnt/nas/smart-quant/src/alpha/cancel_factor.cpp",
+  "file": "/mnt/nas/smart-quant/src/alpha/cancel_factor.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/alpha/cancel_factor.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/alpha/signal_engine.cpp.o -c /mnt/nas/smart-quant/src/alpha/signal_engine.cpp",
+  "file": "/mnt/nas/smart-quant/src/alpha/signal_engine.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/alpha/signal_engine.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/oms/order_manager.cpp.o -c /mnt/nas/smart-quant/src/oms/order_manager.cpp",
+  "file": "/mnt/nas/smart-quant/src/oms/order_manager.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/oms/order_manager.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_core.dir/src/risk/risk_manager.cpp.o -c /mnt/nas/smart-quant/src/risk/risk_manager.cpp",
+  "file": "/mnt/nas/smart-quant/src/risk/risk_manager.cpp",
+  "output": "CMakeFiles/sq_core.dir/src/risk/risk_manager.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_logger.dir/apps/logger/main.cpp.o -c /mnt/nas/smart-quant/apps/logger/main.cpp",
+  "file": "/mnt/nas/smart-quant/apps/logger/main.cpp",
+  "output": "CMakeFiles/sq_logger.dir/apps/logger/main.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_backtest.dir/apps/backtest/main.cpp.o -c /mnt/nas/smart-quant/apps/backtest/main.cpp",
+  "file": "/mnt/nas/smart-quant/apps/backtest/main.cpp",
+  "output": "CMakeFiles/sq_backtest.dir/apps/backtest/main.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_engine.dir/apps/engine/main.cpp.o -c /mnt/nas/smart-quant/apps/engine/main.cpp",
+  "file": "/mnt/nas/smart-quant/apps/engine/main.cpp",
+  "output": "CMakeFiles/sq_engine.dir/apps/engine/main.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -isystem /home/xiaohun/.conan2/p/b/catchf479b3c2ac595/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_tests.dir/tests/test_order_book.cpp.o -c /mnt/nas/smart-quant/tests/test_order_book.cpp",
+  "file": "/mnt/nas/smart-quant/tests/test_order_book.cpp",
+  "output": "CMakeFiles/sq_tests.dir/tests/test_order_book.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -isystem /home/xiaohun/.conan2/p/b/catchf479b3c2ac595/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_tests.dir/tests/test_alpha.cpp.o -c /mnt/nas/smart-quant/tests/test_alpha.cpp",
+  "file": "/mnt/nas/smart-quant/tests/test_alpha.cpp",
+  "output": "CMakeFiles/sq_tests.dir/tests/test_alpha.cpp.o"
+},
+{
+  "directory": "/mnt/nas/smart-quant/build",
+  "command": "/usr/bin/g++ -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -I/mnt/nas/smart-quant/include -isystem /home/xiaohun/.conan2/p/b/quicke1df75a013d39/p/include -isystem /home/xiaohun/.conan2/p/b/spdlo9dac9667d5de0/p/include -isystem /home/xiaohun/.conan2/p/b/fmtf1f2648226fc6/p/include -isystem /home/xiaohun/.conan2/p/b/catchf479b3c2ac595/p/include -g -std=c++20 -Wall -Wextra -Wpedantic -g -O0 -o CMakeFiles/sq_tests.dir/tests/test_risk.cpp.o -c /mnt/nas/smart-quant/tests/test_risk.cpp",
+  "file": "/mnt/nas/smart-quant/tests/test_risk.cpp",
+  "output": "CMakeFiles/sq_tests.dir/tests/test_risk.cpp.o"
+}
+]
